@@ -1,0 +1,667 @@
+\documentclass{article}
+
+\usepackage{listings}
+\usepackage{color}
+\usepackage[utf8]{inputenc}
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+\usepackage[utf8]{inputenc}
+\usepackage{booktabs} % Szép táblázatokhoz
+\usepackage[utf8]{inputenc}
+\usepackage{booktabs} % Szép táblázatokhoz
+
+\usepackage{caption}
+\usepackage{framed}
+
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{float} % Add ezt a sorot a preambulumba
+\lstset{frame=tb,
+  language=python,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numbers=none,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{dkgreen},
+  stringstyle=\color{mauve},
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=3
+}
+
+% Language setting
+% Replace `english' with e.g. `spanish' to change the document language
+\usepackage[english]{babel}
+
+% Set page size and margins
+% Replace `letterpaper' with `a4paper' for UK/EU standard size
+\usepackage[letterpaper,top=2cm,bottom=2cm,left=3cm,right=3cm,marginparwidth=1.75cm]{geometry}
+
+% Useful packages
+\usepackage{amsmath}
+\usepackage{graphicx}
+
+
+\usepackage{tcolorbox}
+\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+
+\title{Regressziós modellek illesztése egy kombináltciklusú erőmű adataira}
+\author{Szilágyi Gergő}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Bevezetés}
+Ebben a dolgozatban a kombinált ciklusú erőművek (CCPP) adatainak különböző regressziós modellekkel történő elemzését mutatom be. 
+Célom, hogy a később felsorolt környezeti változók alapján meg tudjam becsülni az erőmű által leadott elektromos teljesítményt. Ehhez a következő adatokat fogom felhasználni:
+\begin{enumerate}
+    \item Leadott elektromos teljesítmény (PE)
+    \item Környezeti hőmérséklet (AT)
+    \item Atmoszférikus nyomás (AP)
+    \item Relatív páratartalom (RH)
+    \item Vákuum (V)
+\end{enumerate}
+
+A dolgozat az alábbi cikk alapján készült:\\
+\\
+\textit{Prediction of full load electrical power output of a base load operated combined cycle power plant using machine learning methods}
+\\
+\\
+A hivatkozott cikkel ellentétben jelen dolgozat nem foglalkozik a változók kiválasztásával, bár az elkészült kódbázis erre lehetőséget ad.
+\\
+Ezt a témát egy későbbi dolgozat keretében fogom részletezni. Ebben a dolgozatban a következő lépéseket és eredményeket fogom bemutatni:
+\begin{enumerate}
+    \item \textbf{Feltáró Adatelemzés:}\\
+    Az adatok betöltése, vizsgálata, tisztítása és ábrázolása után azonosítom és eltávolítom az outlier-eket, majd egy heatmapet és egy pairplotot mutatok be.
+    
+    \item \textbf{Adatok skálázása és normalizálása:}\\
+    Látni fogjuk, hogy az adatok különböző nagyságrendűek, ami problémát jelenthet a regressziós modellek illesztésénél. Ennek kezelésére előállítom a skálázott és normalizált adatokat.
+    
+    \item \textbf{Regressziós modellek előkészítése és illesztése:}\\
+    Több különböző regressziós modellt fogok bemutatni és alkalmazni, melyeket először röviden ismertetek, majd csoportokba rendezve példányosítom őket. Az előkészített modelleket a tanulóhalmazra illesztem, és az illesztett modellek segítségével előállítom a predikciókat a teszthalmazon.
+    
+    \item \textbf{Kiértékelés és értékelés:}\\
+    A predikciókat összevetem a teszthalmazban található értékekkel, és az alábbi módszerek segítségével értékelem a modelleket:
+    \begin{enumerate}
+        \item $MSE$ (Mean Squared Error)
+        \item $R^2$ a továbbiakban $R2$
+        \item $CV$ keresztvalidáció
+    \end{enumerate}
+    \item \textbf{Összegzés és diszkusszió}\\
+    Végül kiválasztom a legjobbnak ítélt modellt rövid indoklással, összegzem a megoldásom, és kitekintek a további fejlesztési lehetőségekre.
+\end{enumerate}
+Munkám során számos Python könyvtárat használtam az adatkezelés, -elemzés és modellezés megvalósításához. 
+Az adatok betöltéséhez és manipulálásához a \textbf{pandas} és \textbf{numpy} könyvtárakat, a vizualizációk készítéséhez a \textbf{matplotlib} és \textbf{seaborn} könyvtárakat, míg a regressziós modellek illesztéséhez és értékeléséhez az \textbf{scikit-learn} (sklearn) könyvtárat használtam.\\
+Az általam írt teljes kódbázis elérhető a GitHub profilomon, amely a következő linken található:\vspace{1cm}
+\noindent
+\href{https://github.com/szilagyi93/regression}{https://github.com/szilagyi93/regression}.
+
+
+
+\section{Feltáró Adatelemzés}
+\subsection{Beolvasás, hiányos adatok, duplikációk}
+
+\noindent % A blokkok az oldal bal szélétől kezdődjenek
+\begin{tcolorbox}[colframe=black]
+\begin{minipage}{0.5\textwidth}
+    \centering
+    \captionof{table}{Head of Train dataset} % a captionof{table}{...} a table környezet nélkül használható
+    \begin{tabular}{cccccc}
+        \toprule
+        & AT & V & AP & RH & PE \\
+        \midrule
+         0 &10.54 & 34.03 & 1018.71 & 74.00 & 478.77 \\
+         1 &7.08  & 39.99 & 1010.55 & 91.44 & 482.83 \\
+         2 &14.49 & 41.16 & 1000.50 & 82.17 & 465.24 \\
+         3 &10.73 & 25.36 & 1009.35 & 100.15 & 469.43 \\
+         4 &22.88 & 63.91 & 1009.63 & 87.82 & 442.50 \\
+        \bottomrule
+    \end{tabular}
+\end{minipage}%
+\hspace{0.2cm}
+\begin{minipage}{0.5\textwidth}
+    \centering
+    \captionof{table}{Head of Test dataset}
+    \begin{tabular}{cccccc}
+        \toprule
+          &AT & V & AP & RH & PE \\
+        \midrule
+         0 &9.59 & 38.56 & 1017.01 & 60.10 & 481.30 \\
+         1 &12.04 & 42.34 & 1019.72 & 94.67 & 465.36 \\
+         2 &13.87 & 45.08 & 1024.42 & 81.69 & 465.48 \\
+         3 &13.72 & 54.30 & 1017.89 & 79.08 & 467.05 \\
+         4 &15.14 & 49.64 & 1023.78 & 75.00 & 463.58 \\
+        \bottomrule
+    \end{tabular}
+\end{minipage}%
+\end{tcolorbox}
+\noindent
+Elős lépésben betöltöttem  pandas frame-be a tanuló ( pd\_train) és teszt (pd\_test) halmazokat. Miután meggyőződtem róla, hogy a beolvasott táblázatok alakja konzisztensek, tehát az oszlopok száma egyenlő, ellenőriztem az esetleges hiányosságokat.\\
+
+\begin{tcolorbox}[ colframe=black]
+\begin{minipage}{.5\textwidth}
+\begin{lstlisting}[language=Python, caption= Info about Train]
+<class 'pandas.core.frame.DataFrame'>
+RangeIndex: 8568 entries, 0 to 8567
+Data columns (total 5 columns):
+ #   Column  Non-Null Count  Dtype  
+---  ------  --------------  -----  
+ 0   AT      8568 non-null   float64
+ 1   V       8568 non-null   float64
+ 2   AP      8568 non-null   float64
+ 3   RH      8568 non-null   float64
+ 4   PE      8568 non-null   float64
+dtypes: float64(5)
+memory usage: 334.8 KB
+\end{lstlisting}
+\end{minipage}%
+\hspace{0.1cm}
+\begin{minipage}{.5\textwidth}
+\begin{lstlisting}[language=Python, caption= Info about Test]
+<class 'pandas.core.frame.DataFrame'>
+RangeIndex: 1000 entries, 0 to 999
+Data columns (total 5 columns):
+ #   Column  Non-Null Count  Dtype  
+---  ------  --------------  -----  
+ 0   AT      1000 non-null   float64
+ 1   V       1000 non-null   float64
+ 2   AP      1000 non-null   float64
+ 3   RH      1000 non-null   float64
+ 4   PE      1000 non-null   float64
+dtypes: float64(5)
+memory usage: 39.2 KB
+\end{lstlisting}
+\end{minipage}
+\end{tcolorbox}
+\noindent
+Mivel az adathalmazok nem volt hiányosak így a duplikációk keresésével és eliminálásával haladtam tovább. A tanuló halmaz 36 a teszt halmaz pedig 0 duplikációt tartalmazott. Mivel 8568 sorból áll a tanulóhalmaz, így úgy döntöttem, hogy törlöm a duplikált adatokat.
+\noindent % A blokkok az oldal bal szélétől kezdődjenek
+\begin{tcolorbox}[ colframe=black]
+\begin{minipage}{.5\textwidth}
+\begin{lstlisting}[language=Python, caption= Duplication of Train data set]
+Duplications of TRAIN data:
+
+Duplicates: (36, 5)
+Original Shape of Data: (8568, 5)
+No Duplicates Data: (8532, 5)
+\end{lstlisting}
+\end{minipage}%
+\hspace{0.1cm}
+\begin{minipage}{.5\textwidth}
+\begin{lstlisting}[language=Python, caption= Duplication of Test data set]
+Duplications of TEST data:
+
+Duplicates: (0, 5)
+Original Shape of Data: (1000, 5)
+No Duplicates Data: (1000, 5)
+\end{lstlisting}
+\end{minipage}
+\end{tcolorbox}
+
+\subsection{Vizualizáció}
+\subsubsection{Hisztogramok, Boxplotok és outlierek} 
+Annak érdekében, hogy teljesebb képet kapjak a különbőzű változók eloszlásáról ábrázoltam azokat, hisztogram formájában.\\
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{AT_AP_R_V_hist.png}
+    \caption{Histograms of Temperature, Pressure, Humidity, and Vacuum}
+    \label{fig:boxplots}
+\end{figure}
+    
+\noindent
+Az $AT$, $AP$, $RH$, és $V$ változók hisztogram ábárái azt mutatják, hogy az eloszlások többékevésbé normálisak, de az $AT$ (környezeti hőmérséklet) és a $V$ (vákuum) esetében két csúcs látható, ami bimodális eloszlásra utal.\\ 
+Valamint az $R$ (relatív páratartalom) esetén látható negatív skew, ami azt jelzei, hogy az adatok átlaga kisebb, mint a mediánja, ami kisebb mint a módusza.\\
+Mindez jól látható az adatokat jellemző statisztikai momentumokat ábrázoló táblázatban. 
+\begin{tcolorbox}
+\begin{table}[H]
+    \centering
+    \caption{Statisztikai összefoglaló a különböző változókról}
+        \begin{tabular}{lccccc}
+        \toprule
+        Stat & AT & V & AP & RH & PE \\
+        \midrule
+        Count   & 1000.000 & 1000.000 & 1000.000 & 1000.000 & 1000.000 \\
+        Mean    & 20.188   & 54.841   & 1013.106 & 72.501   & 453.176  \\
+        Std     & 7.339    & 12.559   & 5.930    & 15.178   & 16.591   \\
+        Min     & 3.210    & 34.030   & 996.350  & 26.300   & 425.300  \\
+        25\%    & 14.148   & 42.763   & 1008.935 & 61.620   & 438.835  \\
+        50\%    & 21.035   & 52.780   & 1013.005 & 74.395   & 450.415  \\
+        75\%    & 26.145   & 66.560   & 1017.043 & 84.610   & 466.388  \\
+        Max     & 35.010   & 80.180   & 1033.300 & 100.140  & 494.870  \\
+        Median  & 21.035   & 52.780   & 1013.005 & 74.395   & 450.415  \\
+        Skew    & -0.162   & 0.185    & 0.357    & -0.417   & 0.352    \\
+        \bottomrule
+        \end{tabular}
+\end{table}
+\end{tcolorbox}
+\noindent
+Ezek után outliereket azonosításával haladtam tovább. Elsőként elkészítettem a boxplotokat. 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{AT_AP_R_V_box_plot.png}
+    \caption{Visualizations of environmental variables}
+    \label{fig:histograms}
+\end{figure}
+    
+\noindent
+A következő kódrészlet jól mutatja, ami a boxplotokon is valamelyest látható, hogy összesen $92 db$ outlier került azonosításra és eldobásra. 
+ 
+\begin{tcolorbox}
+\begin{minipage}{.5\textwidth}
+    \begin{lstlisting}[language=Python, caption= Duplication of Train data set]
+    def remove_outliers(data):
+        Q1 = data.quantile(0.25)
+        Q3 = data.quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        
+        return data[(data >= lower_bound) & (data <= upper_bound)].dropna()
+    \end{lstlisting}
+\end{minipage}%
+\hspace{0.1cm}
+\begin{minipage}{.5\textwidth}
+    \begin{lstlisting}[language=Python, caption= Duplication of Test data set]
+    shape of original_train_shape (duplications removed): 
+    (8532, 5)
+    shape of filtered_train_shape:  
+    (8440, 5)
+    Number of rows has been removed: 92
+    
+    Filtered data has been saved: 
+     02_data/filtered_train.xlsx
+     
+    \end{lstlisting}
+\end{minipage}
+\end{tcolorbox}
+     
+\subsubsection{Pair plot és heat map}
+
+További elemzés céljából elkészítettem az adatokra vonatkozó pair plotot. 
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{AT_AP_R_V_PE_pair.png}
+\caption{Pair plot of the variables}
+\label{fig:AT_AP_R_V_PE_pair}
+\end{figure}
+\noindent
+A pair plot [\ref{fig:AT_AP_R_V_PE_pair}.] ábrán részletesebben látható, hogy az egyes változók hogyan viszonyulnak egymáshoz.\\
+Az $AT$ és $V$ erőteljes negatív kapcsolatot mutat a $PE$-vel, míg az $AP$ viszonylag kevésbé befolyásolja a teljesítményt. Kicsit letisztultabb képet kapunk az adatokról a heatmap segítségével.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{AT_AP_R_V_PE_heatmap.png}
+\caption{Heat map of variables}
+\label{fig:heat}
+\end{figure}
+\noindent
+A korrelációs heat map [\ref{fig:heat}.] azt mutatja, hogy erős negatív kapcsolat van az $AT$ és a $PE$ között, valamint a $V$ és a $PE$ között is, ami azt sugallja, hogy magasabb $AT$ hőmérséklet  és magasabb vákuum $V$ esetén csökken a $PE$ elektromos teljesítmény. Az $AP$ és a $PE$ között mérsékelt pozitív korreláció látható.
+
+\section{Adatok skálázása és normalizálása}
+Mivel az adatok más nagyságrendbe esnek és ez egyes regressziós modellek illesztését elviheti, így az adatokat transzformálva előállítom a standarizált és a normalizált adatsort.
+\begin{tcolorbox}[colframe=black]
+\begin{minipage}{.5\textwidth}
+\begin{lstlisting}[language=Python, caption= Info about Train]
+scaler = StandardScaler()
+
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+\end{lstlisting}
+\end{minipage}%
+\hspace{0.1cm}
+\begin{minipage}{.5\textwidth}
+\begin{lstlisting}[language=Python, caption= Info about Test]
+min_max_scaler = MinMaxScaler()
+X_train_normalized = min_max_scaler.fit_transform(X_train)
+X_test_normalized = min_max_scaler.transform(X_test)
+\end{lstlisting}
+\end{minipage}
+\end{tcolorbox}
+\noindent
+
+\section{Regressziós modellek és illesztések}
+
+\subsection{Illesztési eljárás}
+Végül a tisztított és skálázott adatokra egy sor regressziós modellt illesztettem, a következő függvény segítségével[\ref{regerssio_modeling}.].
+\begin{tcolorbox}
+\begin{lstlisting}[language=Python, caption= Fiting of the regression models, label=regerssio_modeling ]
+def regerssio_modeling(model, X_train_scaled, X_test_scaled, Y_train, Y_test): 
+    # Model fiting
+    model.fit(X_train_scaled, Y_train)
+    # Makeing prediction
+    Y_pred = model.predict(X_test_scaled)
+    # Evaluating/Scoring the model
+    mse = mean_squared_error(Y_test, Y_pred)
+    r2 = model.score(X_test_scaled, Y_test)
+    cv_results = cross_val_score(model, X_test_scaled,Y_test, cv=kf, scoring='neg_mean_squared_error')
+    return model, Y_pred, mse, r2, cv_results
+\end{lstlisting}
+\end{tcolorbox}
+\vspace{0.5cm} 
+A \textit{$regerssio\_modeling(model, X\_train\_scaled, X\_test\_scaled, Y\_train, Y\_test)$} függény főbb lépései:
+\begin{enumerate}
+    \item[1.] Modell illesztése a skálázott tanító halmazon.
+    \item[2.] Az illesztett modell segítségével az $Y\_pred$ predikciók előállítása.
+    \item[3.] $MSE$ és $R2$  értékek kiszámítása
+    \item [4.] Keresztvalidációs eljárás az illesztet modellen, negatív átlogaos négyzeteshibát használva.
+\end{enumerate}
+\noindent
+Végül a függvény visszatér az illesztett modellel, az $MSE$, $R2$ valamint a $CV$ kersztvalidációs értékekkel.  
+\subsection{Illesztett modellek}
+\subsubsection{Lineáris regressziós modellek:}
+\textbf{Linear Regression}: Alap lineáris regressziós modell\\
+\quad\textbf{Ridge Regression}: L2 regularizációval ellátott Ridge regresszió.
+\begin{figure}[H]
+    \centering
+    % Első sor képei
+    \begin{tabular}{cc}
+        \includegraphics[width=0.40\textwidth]{LinearRegression.png} &
+        \includegraphics[width=0.40\textwidth]{RidgeRegression.png} \\
+    \end{tabular}
+    \caption{Egyszerű regressziós modellek}
+    \label{fig:reg_egyszer}
+\end{figure}
+\noindent
+
+\subsubsection{KNNq alapú regressziós modellek}
+\textbf{KNeighborsRegressor} ($N=5$): Az 5 legközelebbi szomszéd átlagát használja.\\
+\textbf{KNeighborsRegressor} ($N=10$): Az 10 legközelebbi szomszéd átlagát használja.
+\begin{figure}[H]
+\label{fig:knn}
+    \centering
+    % Első sor képei
+    \begin{tabular}{cc}
+        \includegraphics[width=0.40\linewidth]{5 Neighbors Regressor.png} &
+        \includegraphics[width=0.40\linewidth]{10 Neighbors Regressor.png} \\
+    \end{tabular}
+    \caption{KNN regressziós modellek}
+\end{figure}
+\noindent
+\subsubsection{Support Vector alapú regressziós modellek (SVR)}
+\textbf{SVR (poly kernel)}: Polinomiális kernellel.\\
+\textbf{SVR (rbf kernel)}: Radiális bázisfüggvény (Gauss) kernellel.
+\begin{figure}[H]
+\label{fig:svr}
+    \centering
+    % Első sor képei
+    \begin{tabular}{cc}
+        \includegraphics[width=0.40\linewidth]{support_vector_regression_poly_model.png} &
+        \includegraphics[width=0.40\linewidth]{support_vector_regression_rbf_model.png} \\
+    \end{tabular}
+    \caption{Támogató vektor alapú modellek}
+\end{figure}
+
+\subsubsection{Fa-alapú regressziós modellek:}
+\textbf{RandomForestRegressor}: Több döntési fa kombinációját használja.\\
+\textbf{DecisionTreeRegresso}r: Egyetlen döntési fa modell.\\
+\textbf{BaggingRegressor}: SVR alapmodellként, több példány átlagolásával.
+\begin{figure}[H]
+\label{fig:fa}
+    \begin{tabular}{ccc}
+        \includegraphics[width=0.33\linewidth]{RandomForest.png} &
+        \includegraphics[width=0.33\linewidth]{model_decision_tree_regressor.png} &
+        \includegraphics[width=0.33\linewidth]{bagging_model.png} \\
+    \end{tabular}
+    \caption{Fa-alapú regressziós modellek}
+\end{figure}
+
+\subsubsection{Neurális hálózat alapú regressziós modellek (MLPRegressor)}
+\textbf{Multilayer Perceptron 100 RELU ADAM}: 100 rejtett neuronnal, RELU aktivációval, ADAM solverrel.\\
+\textbf{Multilayer Perceptron 100 RELU LBFGS}: 100 rejtett neuronnal, RELU aktivációval, LBFGS solverrel.\\
+\textbf{Multilayer Perceptron 100 IDENTITY ADAM}: 100 rejtett neuronnal, IDENTITY aktivációval, ADAM solverrel.\\
+\textbf{Multilayer Perceptron 100 LOGISTIC ADAM}: 100 rejtett neuronnal, LOGISTIC aktivációval, ADAM solverrel.
+\begin{figure}[H]
+\label{fig:neural}
+    \centering
+    % Első sor képei
+    \begin{tabular}{cc}
+        \includegraphics[width=0.40\linewidth]{Multilayer Perceptron Regressor 100 RELU ADAM.png} &
+        \includegraphics[width=0.40\linewidth]{Multilayer Perceptron Regressor 100 RELU LBFGS.png} \\
+        \includegraphics[width=0.40\linewidth]{Multilayer Perceptron Regressor 100 IDENTITY.png} &
+        \includegraphics[width=0.40\linewidth]{kisfaszom.png}\\
+    \end{tabular}
+    \caption{Neurálishálozat alapú regressziós modellek 100 neuronnal, különböző solver és aktivációs függvénnyel}
+\end{figure}
+
+\subsubsection{További MLPRegressor variánsok}
+50, 40, és 30 rejtett neuronnal, minden esetben RELU aktivációval és ADAM solverrel.
+\begin{figure}[H]
+    
+    \centering
+    % Első sor képei
+    \begin{tabular}{cc}
+        \includegraphics[width=0.40\linewidth]{Multilayer Perceptron Regressor 100 RELU ADAM.png} &
+        \includegraphics[width=0.40\linewidth]{Multilayer Perceptron Regressor 50 RELU ADAM .png} \\
+        \includegraphics[width=0.40\linewidth]{Multilayer Perceptron Regressor 40 RELU ADAM .png} &
+        \includegraphics[width=0.40\linewidth]{Multilayer Perceptron Regressor 30 RELU ADAM .png}\\
+    \end{tabular}
+    \label{fig:304050100}
+    \caption{Neurálishálozat alapú regressziós modellek: 30, 40, 50, 100 neuronnal}
+    
+\end{figure}
+\section{Az $MSE$, $R2$  és $CV$ értékek}
+\subsection{Az $MSE$ értékek}
+Az illesztett modellek $MSE$ értékeit ábrázoló eredményeket [\ref{fig:mse_fig}.] növekvő sorrendben rendeztem mivel a kisebb $MSE$ érték mellett teljesít jobban az illesztett modell, így ebből a szempontból a táblázat első elemi lesznek a legjobbak. A következő tábláztat [\ref{tbl:mse_tbl}.] foglalja össze a sorbarendezett adatokat. 
+\begin{figure}[H]
+
+    \centering
+    % Első sor képei
+    \begin{tabular}{cc}
+        \includegraphics[width=0.40\textwidth]{MSE_GR1.png} &
+        \includegraphics[width=0.40\textwidth]{MSE_GR2.png} \\
+        \includegraphics[width=0.40\textwidth]{MSE_GR3.png} &
+        \includegraphics[width=0.40\textwidth]{MSE_GR4.png}\\
+    \end{tabular}
+    
+    \caption{Az illesztett modellek $MSE$ értékei}
+    \label{fig:mse_fig}
+\end{figure}
+
+\noindent
+
+
+
+\label{tbl:mse_tbl}
+\begin{tcolorbox}
+\begin{tabular}{lll}
+\toprule
+ & Model & $MSE$ \\
+\midrule
+1 & RandomForest & 9.139454 \\
+2 & 5 Neighbors Regressor & 12.332690 \\
+3 & 10 Neighbors Regressor & 13.351379 \\
+4 & MLPRegressor h.l. $= 100$, act. = RELU, sol. = LBFGS & 14.816404\\
+5 & MLPRegressor h.l. = 100, act. = RELU, sol. = ADAM  & 15.217100\\
+6 & MLPRegressor h.l. = 100, act. = RELU, sol. = ADAM & 15.437234\\
+7 & MLPRegressor h.l. = 50, act. = RELU, sol. = ADAM  & 15.551677\\
+8 & MLPRegressor h.l. = 30, act. = RELU, sol. = ADAM  & 15.904665\\
+9 & MLPRegressor h.l. = 100, act. = LOGISTIC, sol. = ADAM & 15.933903\\
+10 & MLPRegressor h.l. = 40, act. = RELU, sol. = ADAM  & 15.962066\\
+11 & bagging model & 16.020971\\
+12 & support vector regression rbf model & 16.070784\\
+13 & model decision tree regressor & 17.750337\\
+14 & LinearRegression & 18.603112\\
+15 & RidgeRegression & 18.603730 \\
+16 & MLPRegressor h.l. = 100, act. = IDENTITY, sol. = ADAM  & 18.608023\\
+17 & support vector regression poly model & 62.051293\\
+\bottomrule
+\end{tabular}
+\end{tcolorbox}
+\captionof{table}{Model Mean Squared Error (MSE)} % Cím a táblázatnak
+Az növekvekvő sorrendbe rendezett $MSE$  értékeket ábrázoló táblázat [\ref{tbl:mse_tbl}.] alapján a legjobb illesztett modell a Random Forest $MSE = 9.139454$ értékkel.
+
+\subsection{Az $R2$ értékek}
+Továbbá megvizsgáltam az illesztett modellek $R2$ értékeit is [\ref{fig:r2_fig}.], amelyeket szintén táblázatba rendeztem[\ref{tbl:r2}.]. Minél inkább $1$-hez tart az $R2$ értéke annál jobb az illesztett modell.
+\begin{figure}[H]
+    \centering
+    % Első sor képei
+    \begin{tabular}{cc}
+        \includegraphics[width=0.40\textwidth]{R2_GR1.png} &
+        \includegraphics[width=0.40\textwidth]{R2_GR2.png} \\
+        \includegraphics[width=0.40\textwidth]{R2_GR3.png} &
+        \includegraphics[width=0.40\textwidth]{R2_GR4.png}\\
+    \end{tabular}
+    \caption{Az illesztett modellek $R2$ értékei}
+    \label{fig:r2_fig}
+\end{figure}
+
+
+\label{tbl:r2}
+\begin{tcolorbox}
+\begin{tabular}{lll}
+\toprule
+ & Model & $R2$  \\
+\midrule
+1 & RandomForest & 0.966764 \\
+2 & 5 Neighbors Regressor & 0.955152 \\
+3 & 10 Neighbors Regressor & 0.951448 \\
+4 & MLPRegressor h.l. = 100, act. = RELU, sol. = LBFGS  & 0.946120 \\
+5 & MLPRegressor h.l. = 100, act. = RELU, sol. = ADAM  & 0.944663 \\
+6 & MLPRegressor h.l. = 100,  act. = RELU, sol. = ADAM  & 0.943862 \\
+7 & MLPRegressor h.l. = 50, act. = RELU, sol. = ADAM  & 0.943446 \\
+8 & MLPRegressor h.l. = 30, act. = RELU, sol. = ADAM  & 0.942162 \\
+9 & MLPRegressor h.l. = 100, act. = LOGISTIC, sol. = ADAM  & 0.942056 \\
+10 & MLPRegressor h.l. = 40, act. = RELU, sol. = ADAM  & 0.941954 \\
+11 & bagging model & 0.941739 \\
+12 & support vector regression rbf model & 0.941558 \\
+13 & model decision tree regressor & 0.935451 \\
+14 & LinearRegression & 0.932349 \\
+15 & RidgeRegression & 0.932347 \\
+16 & MLPRegressor h.l. = 100, act. = IDENTITY, sol. = ADAM  & 0.932332 \\
+17 & support vector regression poly model & 0.774350 \\
+\bottomrule
+\end{tabular}
+\end{tcolorbox}
+\captionof{table}{Model $R2$ } % Cím a táblázatnak
+A sorbarendezett $R2$ értékeket bemutató táblázat [\ref{tbl:r2}.] alapján a legjobb modell ismét a Random Forest.
+
+\subsection{A $CV$ értékek}
+Továbbá az illesztett modellek jóságáról keresztvalidációval győződtem meg. Ehhez az sklearn beépített függvényét használtam és $4$ szekcióra osztásos, negatív $MSE$ validálást használtam. Végeredményben azt várom el, hogy a  negatív $MSE$ értékek minél közelebb legyenek a nullához. \\
+A különböző szekciókon elért $CV$ értékek egyben nehezen olvashatóak. Az áttekinthetőség érdekében a modelleket kisebb csoportokra bontva ábrázoltam minden egyes szekción elért $CV$ értéket: [\ref{fig:cv_mse_std_fig1}.], [\ref{fig:cv_mse_std_fig2}.], [\ref{fig:cv_mse_std_fig3}.], [\ref{fig:cv_mse_std_fig1}.], [\ref{fig:cv_mse_std_fig4}.]. 
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{CV_GR1.png} \\
+\caption{$CV$ értétkek az első csoportra}
+\label{fig:cv_mse_std_fig1}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{CV_GR2.png} \\
+\caption{$CV$ értétkek a második csoportra}
+\label{fig:cv_mse_std_fig2}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{CV_GR3.png} \\
+\caption{$CV$ értétkek a harmadik csoportra}
+\label{fig:cv_mse_std_fig3}
+\end{figure}
+
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{CV_GR4.png}\\
+\caption{$CV$ értétkek a negyedik csoportra}
+\label{fig:cv_mse_std_fig4}
+\end{figure}
+
+Az ábrázolt $CV$ értékeket átlagoltam és szórásukat kiszámoltam. Majd az átlagos $CV$ alapján sorba rendeztem és táblázatba foglaltam. [\ref{tbl:cv_mean_std}.]
+
+\label{tbl:cv_mean_std}
+\begin{tcolorbox}
+\begin{tabular}{llrr}
+\toprule
+ & model & mean & std \\
+\midrule
+1 & RandomForest & -15.689774 & 1.917985 \\
+2 & MLP Regressor h.l = 100, act. = LOGISTIC, sol. = ADAM & -16.336734 & 1.346644 \\
+3 & MLP Regressor h.l. = 100, act. = RELU, sol. = ADAM  & -16.397656 & 0.736577 \\
+4 & MLP Regressor h.l. = 50, act. = RELU, sol. = ADAM  & -16.521706 & 0.671067 \\
+5 & MLP Regressor h.l. = 100, act. = RELU, sol. = ADAM  & -16.526903 & 0.638601 \\
+6 & MLP Regressor h.l. = 40, act. = RELU, sol. = ADAM  & -16.677764 & 0.804133 \\
+7 & MLP Regressor h.l. = 30, act. = RELU, sol. = ADAM  & -17.483360 & 1.054920 \\
+8 & MLP Regressor h.l. = 100, act. = RELU, sol. = LBFGS  & -17.596056 & 3.671532 \\
+9 & LinearRegression & -18.053879 & 1.678370 \\
+10 & MLP Regressor h.l. = 100, act. = IDENTITY, sol. = ADAM  & -18.055432 & 1.680409 \\
+11 & RidgeRegression & -18.058969 & 1.664198 \\
+12 & model\_decision\_tree\_regressor & -19.637381 & 2.204280 \\
+13 & 10 Neighbors Regressor & -20.270605 & 1.595526 \\
+14 & 5 Neighbors Regressor & -20.986786 & 2.132396 \\
+15 & support\_vector\_regression\_rbf\_model & -22.452122 & 1.359736 \\
+16 & bagging\_model & -22.504685 & 1.261549 \\
+\bottomrule
+\end{tabular}
+
+\end{tcolorbox}
+\captionof{table}{Mean and std of $CV$ scores of the models}
+
+Az átlagos keresztvalidációs értékeket és azok szórását bemutató táblázat [\ref{tbl:cv_mean_std}.] alapján legjobb modell ismét a Random Forest.\\
+Azonban több modell is hasnló átlagos $CV$ értékkel szerepel de eltérő szórással. Így érdekes lehet egy scatter ploton ábrázolni az adatokat. 
+\begin{figure}[H]
+\centering
+\includegraphics[width=1\linewidth]{model_scatter1.png} \\
+\caption{Illesztett modellek átlagos $CV$ értkéke és szórása.}
+\label{fig:model_scatter1}
+\end{figure}
+A [\ref{fig:model_scatter1}.] képen jól látható az illesztett modellek elhelyezkedése az átlagos $CV$ és $CV$ szórás térben. Itt az átlagértétkek negatívak, mivel negatív $MSE$ validálást használtam. Lényegében azt a modelt érdemes kiválasztani aminek átlagos $CV$ értéke és szórása közel $0$, tehát a lehető legközelebb esik az origóhoz.\\
+Elsőként a zöld négyzetben található modellekre szűkítettem a lehetséges legjobb modellt választását.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1\linewidth]{model_scatter2.png} \\
+\caption{A legjobbnak ítélt modellek csoportja.}
+\label{fig:model_scatter2}
+\end{figure}
+Ezt követően tovább szűkítettem a kört és eldobtam azokat a modelleket amelyek $CV$ átlaga ugyan benne van a zöld négyzetben de közel a határhoz. Továbbá azt a modellt is eldobtam amely $CV$ átlaga nem sokkal jobb a többinél, viszont szórása sokkal nagyobb. Így kaptam meg a végső ábrát ahonnan már leolvasható a legjobb modell. [\ref{fig:model_scatter3}.]
+\begin{figure}[H]
+\centering
+\includegraphics[width=1\linewidth]{model_scatter3.png} \\
+\caption{A legszűkebb csoport ahonnan érdemes modellt választani.}
+\label{fig:model_scatter3}
+\end{figure}
+A [\ref{fig:model_scatter3}.] ábrán nem csak ki tudtam választani a legjobb modellt, de néhány megfigyelést is tettem az MLP Regresszorokra nézve. Ezt az \ref{'sect:osszegzes'}. Összegzés és diszkusszió fejezetben részletesen bemutatom.
+
+
+\section{Összegzés és diszkusszió} \label{'sect:osszegzes'}
+\subsection{Legjobb modell kiválasztása}
+Az  [\ref{fig:model_scatter3_final}.] ábrán bejelöltem piros színnel az általam legjobbnak ítélt modellt. Ez pedig az \textbf{MLP Regresszor 100 neuronnal, ADAM solverrel és RELU aktivációs függvénnyel}. Továbbá megfigyeltem, ahogyan növekszik a modell teljesítménye a neuronok számának 30-ról 100-ig történő növelésével amelyet kék nyíllal jelöltem.\\
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=1\linewidth]{model_scatter3_final.png} \\
+\caption{A legjobb modell piros színnel jelölve. A kék nyilak mutatják a MLP Regresszor modell teljesítményének változását a neuronok növelésével. A narancssárga keret pedig egy alternatív legjobb választást jelöl. }
+\label{fig:model_scatter3_final}
+\end{figure}
+\subsection{Alternatív legjobb modell}
+Egy másik alternatív modell is kiválasztásra került, ez pedig nem más mint a korábbi $MSE$ és $R2$  táblázatokban legjobbnak ítélt \textbf{Random Forest}. \\Azért tartom  fontosnak megemlíteni ezt modellt is mint lehetséges jó megoldást, mivel ez a modell átlagosan egy kicsivel jobban teljesít a  keresztvalidáció 4 tartományán. Jól lehet, a szórása ($1.917985$)  több mint kétszerese a legjobbnak ítélt MLP Regresszornál ($0.736577$).\\ 
+Mivel jelenleg a szomszédban dúló háború miatt a velünk egy hálózatba kapcsolt Ukrajna elveszítette az erőművi kapacitásainak több mint  $ 10\% $-, továbbá a rendszerbe kötött megújuló energiaforrások leadott teljesítménye is ingadozó így elképzelhető, hogy jobb egy átlagosan körülbelül $5\%$-al jobban teljesítő modell, a teljes hálózat szempontjából, még akkor is ha a szórása több mint kétszerese az MLP Regresszorénak. Ilyen eset lehet például az amikor hosszú évekig nem lehet jelentősen javítani a hálózatot, és így az ingadozások elfogadhatóak. 
+
+\subsection{Kódbázis}
+Ezen dolgozat minden eleme, a kiértékeléssel kapcsolatos adatok és lejárások megtalálhatóak a gitHub oldalamon. 
+\href{https://github.com/szilagyi93/regression/tree/main/01_main}{https://github.com/szilagyi93/regression/tree/main/01\_main}.\\
+\\
+A főbb lépések a következő 3 jupyter notebookban találhatóak:
+\begin{enumerate}
+    \item[1.] eda\_ccpp.ipynb: Adtok beolvasása, tisztítása és EDA .
+    \item[2.] modelfitting\_ccpp.ipynb: Regressziós modellek példányosítása, illesztés és predikált vs. aktuális adatok és ábrák
+    (ennek futtatása körülbelül 7-9 percet vesz igénybe).
+    \item[3.] score\_evaluation\_ccpp.ipynb: az illesztett modellek $MSE$, $R2$  és $CV$ értékeit itt értékelem ki, foglalom táblázatba és ábárázolom.
+\end{enumerate}
+Az egyszerűség kedvéért .html formátumban is feltölöttem az említette notebook-okat így, egy böngészőből is megnyitható. 
+\subsection{Kimaradt részek és potenciális fejlesztési pontok}
+Ahogy a dolgozat elején is írtam, egy lehetséges fejlesztési pont lenne, hogy ha nem az összes változót, hanem azoknak egy csoportját használnám fel modell illesztéshez. Ehhez valószínűleg jobb lenne az sklearn helyett más könyvtárat használni.\\ 
+Továbbá jupyter notbook helyett ekkor már más fejlesztőkörnyzetben rendes OO programot kell írni, tesztekkel megtámogatva.\\
+Végül az adatokat és a függvényillesztést is elegáns lenne kiszervezni egy felhőszolgátásba.\\
+Végezetül pedig egy példát lehetne mutatni a túltanult és alul tanult modellre.
+
+\end{document}
