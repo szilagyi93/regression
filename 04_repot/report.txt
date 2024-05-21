@@ -99,9 +99,12 @@ Ezt a témát egy későbbi dolgozat keretében fogom részletezni. Ebben a dolg
 \end{enumerate}
 Munkám során számos Python könyvtárat használtam az adatkezelés, -elemzés és modellezés megvalósításához. 
 Az adatok betöltéséhez és manipulálásához a \textbf{pandas} és \textbf{numpy} könyvtárakat, a vizualizációk készítéséhez a \textbf{matplotlib} és \textbf{seaborn} könyvtárakat, míg a regressziós modellek illesztéséhez és értékeléséhez az \textbf{scikit-learn} (sklearn) könyvtárat használtam.\\
-Az általam írt teljes kódbázis elérhető a GitHub profilomon, amely a következő linken található:\vspace{1cm}
+Az általam írt teljes kódbázis elérhető a GitHub profilomon, amely a következő linken található:\vspace{0.3cm}
 \noindent
-\href{https://github.com/szilagyi93/regression}{https://github.com/szilagyi93/regression}.
+\begin{center}
+\href{https://github.com/szilagyi93/regression/tree/main/01_main}{\textbf{https://github.com/szilagyi93/regression/tree/main/01\_main}}.
+\end{center}
+
 
 
 
@@ -652,16 +655,19 @@ Ezen dolgozat minden eleme, a kiértékeléssel kapcsolatos adatok és lejárás
 \\
 A főbb lépések a következő 3 jupyter notebookban találhatóak:
 \begin{enumerate}
-    \item[1.] eda\_ccpp.ipynb: Adtok beolvasása, tisztítása és EDA .
-    \item[2.] modelfitting\_ccpp.ipynb: Regressziós modellek példányosítása, illesztés és predikált vs. aktuális adatok és ábrák
+    \item[1.] \href{https://github.com/szilagyi93/regression/blob/main/01_main/eda_ccpp.ipynb}{eda\_ccpp.ipynb}: Adtok beolvasása, tisztítása és EDA .
+    \item[2.] \href{https://github.com/szilagyi93/regression/blob/main/01_main/model_fitting_ccpp.ipynb}{model\_fitting\_ccpp.ipynb}: Regressziós modellek példányosítása, illesztés és predikált vs. aktuális adatok és ábrák
     (ennek futtatása körülbelül 7-9 percet vesz igénybe).
-    \item[3.] score\_evaluation\_ccpp.ipynb: az illesztett modellek $MSE$, $R2$  és $CV$ értékeit itt értékelem ki, foglalom táblázatba és ábárázolom.
+    \item[3.] \href{https://github.com/szilagyi93/regression/blob/main/01_main/score_evaluation_ccpp.ipynb}{score\_evaluation\_ccpp.ipynb}: Az illesztett modellek $MSE$, $R2$  és $CV$ értékeit itt értékelem ki, foglalom táblázatba és ábárázolom.
 \end{enumerate}
 Az egyszerűség kedvéért .html formátumban is feltölöttem az említette notebook-okat így, egy böngészőből is megnyitható. 
 \subsection{Kimaradt részek és potenciális fejlesztési pontok}
-Ahogy a dolgozat elején is írtam, egy lehetséges fejlesztési pont lenne, hogy ha nem az összes változót, hanem azoknak egy csoportját használnám fel modell illesztéshez. Ehhez valószínűleg jobb lenne az sklearn helyett más könyvtárat használni.\\ 
-Továbbá jupyter notbook helyett ekkor már más fejlesztőkörnyzetben rendes OO programot kell írni, tesztekkel megtámogatva.\\
-Végül az adatokat és a függvényillesztést is elegáns lenne kiszervezni egy felhőszolgátásba.\\
-Végezetül pedig egy példát lehetne mutatni a túltanult és alul tanult modellre.
+
+\begin{enumerate}
+    \item Ahogy a dolgozat elején is írtam, egy lehetséges fejlesztési pont lenne, hogy ha nem az összes változót, hanem azoknak egy csoportját használnám fel modell illesztéshez. Ehhez valószínűleg jobb lenne az sklearn helyett más könyvtárat használni.
+    \item Továbbá jupyter notbook helyett ekkor már más fejlesztőkörnyzetben rendes OO programot kell írni, tesztekkel megtámogatva.
+    \item Végül az adatokat és a függvényillesztést is elegáns lenne kiszervezni egy felhőszolgátásba.
+    \item Végezetül pedig egy példát lehetne mutatni a túltanult és alul tanult modellre.
+\end{enumerate}
 
 \end{document}
